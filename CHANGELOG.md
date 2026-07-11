@@ -1,6 +1,150 @@
 Release Notes
 ====
 
+# 06-30-2026
+<a href="https://www.nuget.org/packages/dotnext.net.cluster/6.4.0">DotNext.Net.Cluster 6.4.0</a>
+* Fixed potential [NullReferenceException](https://learn.microsoft.com/en-us/dotnet/api/system.nullreferenceexception) in `WriteAheadLog` constructor
+
+<a href="https://www.nuget.org/packages/dotnext.aspnetcore.cluster/6.4.0">DotNext.AspNetCore.Cluster 6.4.0</a>
+* Updated dependencies
+
+# 06-22-2026
+<a href="https://www.nuget.org/packages/dotnext.threading/6.4.0">DotNext.Threading 6.4.0</a>
+* Added `AsyncStateTracker` synchronization primitive that allows to produce a stream of state changes
+
+# 06-02-2026
+<a href="https://www.nuget.org/packages/dotnext/6.3.0">DotNext 6.3.0</a>
+* Added `SequenceEqual` and `SequenceCompareTo` extension methods for [ReadOnlySequence&lt;T&gt;](https://learn.microsoft.com/en-us/dotnet/api/system.buffers.readonlysequence-1) type
+
+<a href="https://www.nuget.org/packages/dotnext.metaprogramming/6.3.0">DotNext.Metaprogramming 6.3.0</a>
+* Updated dependencies
+
+<a href="https://www.nuget.org/packages/dotnext.unsafe/6.3.0">DotNext.Unsafe 6.3.0</a>
+* Updated dependencies
+
+<a href="https://www.nuget.org/packages/dotnext.threading/6.3.0">DotNext.Threading 6.3.0</a>
+* Updated dependencies
+
+<a href="https://www.nuget.org/packages/dotnext.io/6.3.0">DotNext.IO 6.3.0</a>
+* Updated dependencies
+
+<a href="https://www.nuget.org/packages/dotnext.net.cluster/6.3.0">DotNext.Net.Cluster 6.3.0</a>
+* For single node setup, Raft node starts as leader without waiting for the candidate timeout
+
+<a href="https://www.nuget.org/packages/dotnext.aspnetcore.cluster/6.3.0">DotNext.AspNetCore.Cluster 6.3.0</a>
+* Updated dependencies
+
+<a href="https://www.nuget.org/packages/dotnext.maintenanceservices/1.3.0">DotNext.MaintenanceServices 1.3.0</a>
+* Updated dependencies
+
+# 05-20-2026
+<a href="https://www.nuget.org/packages/dotnext.threading/6.2.3">DotNext.Threading 6.2.3</a>
+* `PendingTaskInterruptedException.Reason` property returns `InnerException` if another reason is not defined
+
+<a href="https://www.nuget.org/packages/dotnext.net.cluster/6.2.3">DotNext.Net.Cluster 6.2.3</a>
+* Improved logging and error reporting in `WriteAheadLog` and `RaftCluster` classes in case of critical failures
+
+<a href="https://www.nuget.org/packages/dotnext.aspnetcore.cluster/6.2.3">DotNext.AspNetCore.Cluster 6.2.3</a>
+* Updated dependencies
+
+# 05-17-2026
+<a href="https://www.nuget.org/packages/dotnext.net.cluster/6.2.2">DotNext.Net.Cluster 6.2.2</a>
+* Fix: snapshot file produced by `SimpleStateMachine` is opened with `FileOptions.Asynchronous` flag
+
+<a href="https://www.nuget.org/packages/dotnext.aspnetcore.cluster/6.2.2">DotNext.AspNetCore.Cluster 6.2.2</a>
+* Updated dependencies
+
+# 05-12-2026
+<a href="https://www.nuget.org/packages/dotnext/6.2.1">DotNext 6.2.1</a>
+* Improved performance of `Number.RoundUp` extension method
+
+<a href="https://www.nuget.org/packages/dotnext.metaprogramming/6.2.1">DotNext.Metaprogramming 6.2.1</a>
+* Updated dependencies
+
+<a href="https://www.nuget.org/packages/dotnext.unsafe/6.2.1">DotNext.Unsafe 6.2.1</a>
+* Improved performance of views produced by extension methods in `MemoryMappedFileExtensions` class
+
+<a href="https://www.nuget.org/packages/dotnext.threading/6.2.1">DotNext.Threading 6.2.1</a>
+* `ScheduleAsync` methods are now available as static extension methods for [TaskScheduler](https://learn.microsoft.com/en-us/dotnet/api/system.threading.tasks.taskscheduler) class
+
+<a href="https://www.nuget.org/packages/dotnext.io/6.2.1">DotNext.IO 6.2.1</a>
+* `FileBufferingWriter` uses memory-mapped file rather than private memory to represent the written content if it's larger than memory threshold
+
+<a href="https://www.nuget.org/packages/dotnext.net.cluster/6.2.1">DotNext.Net.Cluster 6.2.1</a>
+* Improved accuracy of `WriteAheadLog` metrics
+* Added `ReplicationLag` configuration property for Raft nodes
+* Lease-based linearizable read is disabled by default for optimization purposes. Use `IsLeaderLeaseEnabled` configuration property to enable it
+* Fixed heartbeat timeout: it should be less than the lower election timeout to satisfy Timing Requirement in Raft
+
+<a href="https://www.nuget.org/packages/dotnext.aspnetcore.cluster/6.2.1">DotNext.AspNetCore.Cluster 6.2.1</a>
+* Updated dependencies
+
+<a href="https://www.nuget.org/packages/dotnext.maintenanceservices/1.2.1">DotNext.MaintenanceServices 1.2.1</a>
+* Updated dependencies
+
+# 05-07-2026
+This release contains major update of Raft implementation: leader can move forward to the next heartbeat round when the majority committed the log entry. Before `6.2.0`, leader was able to commit the log entry when the majority confirmed the replication, however, for the next heartbeat round it had to wait all cluster members. The overall latency was impacted. Now, slow cluster member cannot impact the latency. The core of the replication is significantly modified to achieve this behavior:
+1. WAL binary format remains the same, so you can migrate existing data in the log smoothly
+2. Cluster configuration storage format is changed. It's not backward compatible
+3. Wire protocol for communication between cluster nodes is changed. It's not backward compatible
+
+<a href="https://www.nuget.org/packages/dotnext/6.2.0">DotNext 6.2.0</a>
+* Added `T.ZeroBytes` static extension property which returns zero bytes for particular numeric type
+*
+
+<a href="https://www.nuget.org/packages/dotnext.metaprogramming/6.2.0">DotNext.Metaprogramming 6.2.0</a>
+* Updated dependencies
+
+<a href="https://www.nuget.org/packages/dotnext.unsafe/6.2.0">DotNext.Unsafe 6.2.0</a>
+* Updated dependencies
+
+<a href="https://www.nuget.org/packages/dotnext.threading/6.2.0">DotNext.Threading 6.2.0</a>
+* Increased chance of object reusability when it's rented from and returned to `BoundedObjectPool<T>`
+* Added `CancellationToken.Combine` static extension method which allows to combine multiple cancellation tokens without `CancellationTokenMultiplexer` instance
+* Fixed documentation for SIEVE cache: [283](https://github.com/dotnet/dotNext/pull/283)
+
+<a href="https://www.nuget.org/packages/dotnext.io/6.2.0">DotNext.IO 6.2.0</a>
+* Updated dependencies
+
+<a href="https://www.nuget.org/packages/dotnext.net.cluster/6.2.0">DotNext.Net.Cluster 6.2.0</a>
+* Major performance improvement: leader advances forward to the next heartbeat round when the majority is committed the log entry, without waiting for the rest of nodes
+* Major performance improvement: AppendEntries RPC message doesn't carry cluster configuration data anymore, which reduces the network overhead
+* Introduced different types of read barriers in Raft
+* Cluster configuration system is now tightly integrated with WAL and replication mechanism
+* `IRaftCluster.ReplicateAsync` method return type is changed from `ValueTask<bool>` to `ValueTask` for simplicity
+* Smallish perf improvements of `WriteAheadLog` class
+
+<a href="https://www.nuget.org/packages/dotnext.aspnetcore.cluster/6.2.0">DotNext.AspNetCore.Cluster 6.2.0</a>
+* Updated dependencies
+
+<a href="https://www.nuget.org/packages/dotnext.maintenanceservices/1.2.0">DotNext.MaintenanceServices 1.2.0</a>
+* Updated dependencies
+
+# 03-29-2026
+<a href="https://www.nuget.org/packages/dotnext/6.1.0">DotNext 6.1.0</a>
+* Fixed cancellation support in `BufferWriterSlim<T>`
+* `BoxedValue<T>` cannot be derived anymore (which was a bug)
+
+<a href="https://www.nuget.org/packages/dotnext.metaprogramming/6.1.0">DotNext.Metaprogramming 6.1.0</a>
+* Updated dependencies
+
+<a href="https://www.nuget.org/packages/dotnext.unsafe/6.1.0">DotNext.Unsafe 6.1.0</a>
+* Added cleanup callback for `OpaqueValue<T>` that can be passed to the unmanaged code
+
+<a href="https://www.nuget.org/packages/dotnext.threading/6.1.0">DotNext.Threading 6.1.0</a>
+* Added alternate lookup to `RandomAccessCache<TKey, TValue>` class
+* Fixed false positive when the object cannot be returned to the object pool even if there is a free space in it
+
+<a href="https://www.nuget.org/packages/dotnext.io/6.1.0">DotNext.IO 6.1.0</a>
+* Updated dependencies
+
+<a href="https://www.nuget.org/packages/dotnext.net.cluster/6.1.0">DotNext.Net.Cluster 6.1.0</a>
+* Fixed memory leak [280](https://github.com/dotnet/dotNext/pull/280)
+* Refresh election timer when vote is granted [281](https://github.com/dotnet/dotNext/pull/281)
+
+<a href="https://www.nuget.org/packages/dotnext.aspnetcore.cluster/6.1.0">DotNext.AspNetCore.Cluster 6.1.0</a>
+* Updated dependencies
+
 # 03-09-2026
 .NEXT 6.0.0 has been released! Migration guide is [here](https://dotnet.github.io/dotNext/migration/4.html). All changes are mostly driven by [Extension Members](https://learn.microsoft.com/en-us/dotnet/csharp/whats-new/csharp-14#extension-members) feature in C# 14. Most of the things in .NEXT now expressed naturally as extensions for existing .NET classes.
 

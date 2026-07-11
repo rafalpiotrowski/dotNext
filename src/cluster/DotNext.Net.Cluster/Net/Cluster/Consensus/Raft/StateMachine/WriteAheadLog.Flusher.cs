@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
-using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 
 namespace DotNext.Net.Cluster.Consensus.Raft.StateMachine;
@@ -76,8 +75,8 @@ partial class WriteAheadLog
         }
         catch (Exception e) when (T.IsBackground)
         {
-            backgroundTaskFailure = ExceptionDispatchInfo.Capture(e);
-            appliedEvent.Interrupt(e);
+            backgroundTaskFailure = e;
+            appliedEvent.Interrupt(new InternalException(e));
         }
         finally
         {
@@ -93,7 +92,7 @@ partial class WriteAheadLog
         var fromMetadata = metadataPages.GetView<MetadataReader>(fromIndex).Metadata;
         var dataTask = dataPages.FlushAsync(fromMetadata.Offset, toMetadata.End, token).AsTask();
 
-        FlushRateMeter.Add(toIndex - fromIndex, measurementTags);
+        FlushRateMeter.Add(toIndex - fromIndex + 1L, measurementTags);
         return Task.WhenAll(metadataTask, dataTask);
     }
 

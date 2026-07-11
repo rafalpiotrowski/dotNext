@@ -9,11 +9,11 @@ using NullLoggerFactory = Microsoft.Extensions.Logging.Abstractions.NullLoggerFa
 namespace DotNext.Net.Cluster.Consensus.Raft;
 
 using Buffers;
-using CustomTransport;
 using Membership;
 using Security;
-using Tcp;
-using TransportServices;
+using NetworkTransport;
+using NetworkTransport.ConnectionOriented.Custom;
+using NetworkTransport.ConnectionOriented.Tcp;
 
 public partial class RaftCluster
 {
@@ -22,23 +22,16 @@ public partial class RaftCluster
     /// </summary>
     public abstract class NodeConfiguration : IClusterMemberConfiguration
     {
-        private double heartbeatThreshold;
-        private ElectionTimeout electionTimeout;
-        private TimeSpan? requestTimeout;
-        private int warmupRounds;
+        private readonly ElectionTimeout electionTimeout;
+        private readonly TimeSpan? requestTimeout;
 
         private protected NodeConfiguration()
-        {
-            electionTimeout = Raft.ElectionTimeout.Recommended;
-            heartbeatThreshold = 0.5D;
-            Metadata = new Dictionary<string, string>();
-            warmupRounds = 10;
-        }
+            => electionTimeout = Raft.ElectionTimeout.Recommended;
 
         /// <summary>
         /// Gets the address used for hosting local member.
         /// </summary>
-        public abstract EndPoint HostEndPoint { get; }
+        protected abstract EndPoint HostEndPoint { get; }
 
         /// <summary>
         /// Gets the address of the local member visible to other members.
@@ -47,29 +40,23 @@ public partial class RaftCluster
         public EndPoint PublicEndPoint
         {
             get => field ?? HostEndPoint;
-            set;
+            init;
         }
 
         /// <summary>
         /// Gets or sets the storage for cluster configuration.
         /// </summary>
         /// <remarks>
-        /// If not set then use in-memory storage by default.
+        /// <see langword="null"/> value means in-memory configuration storage.
         /// </remarks>
-        public IClusterConfigurationStorage<EndPoint>? ConfigurationStorage { get; set; }
-
-        /// <summary>
-        /// Sets <see cref="ConfigurationStorage"/> to in-memory configuration storage.
-        /// </summary>
-        /// <remarks>
-        /// This storage is not recommended for production use.
-        /// </remarks>
-        /// <returns>The constructed storage.</returns>
-        public InMemoryClusterConfigurationStorage<EndPoint> UseInMemoryConfigurationStorage()
+        [AllowNull]
+        public required IClusterConfigurationStorage<EndPoint> ConfigurationStorage
         {
-            var storage = new InMemoryClusterConfigurationStorage(this.As<IClusterMemberConfiguration>().EndPointComparer, MemoryAllocator);
-            ConfigurationStorage = storage;
-            return storage;
+            get;
+            init => field = value ?? new InMemoryClusterConfigurationStorage(this.As<IClusterMemberConfiguration>().EndPointComparer)
+            {
+                MemoryAllocator = MemoryAllocator,
+            };
         }
 
         /// <summary>
@@ -77,14 +64,14 @@ public partial class RaftCluster
         /// </summary>
         /// <remarks>
         /// The threshold should be in range (0, 1). The heartbeat timeout is computed as
-        /// node election timeout X threshold. The default is 0.5.
+        /// <see cref="LowerElectionTimeout"/> timeout multiplied by threshold. The default is 0.5.
         /// </remarks>
         /// <exception cref="ArgumentOutOfRangeException">Attempts to set invalid value.</exception>
         public double HeartbeatThreshold
         {
-            get => heartbeatThreshold;
-            set => heartbeatThreshold = value is > 0D and < 1D ? value : throw new ArgumentOutOfRangeException(nameof(value));
-        }
+            get;
+            init => field = value is > 0D and < 1D ? value : throw new ArgumentOutOfRangeException(nameof(value));
+        } = 0.5D;
 
         /// <summary>
         /// Gets lower possible value of leader election timeout, in milliseconds.
@@ -92,7 +79,7 @@ public partial class RaftCluster
         public int LowerElectionTimeout
         {
             get => electionTimeout.LowerValue;
-            set => electionTimeout = electionTimeout with { LowerValue = value };
+            init => electionTimeout = electionTimeout with { LowerValue = value };
         }
 
         /// <summary>
@@ -102,7 +89,7 @@ public partial class RaftCluster
         public MemoryAllocator<byte> MemoryAllocator
         {
             get => field ??= ArrayPool<byte>.Shared.ToAllocator();
-            set;
+            init;
         }
 
         /// <summary>
@@ -112,22 +99,22 @@ public partial class RaftCluster
         public ClusterMemberAnnouncer<EndPoint>? Announcer
         {
             get;
-            set;
+            init;
         }
 
         /// <summary>
-        /// Gets or sets the numbers of rounds used to warmup a fresh node which wants to join the cluster.
+        /// Gets or sets the numbers of rounds used to warm up a fresh node which wants to join the cluster.
         /// </summary>
         public int WarmupRounds
         {
-            get => warmupRounds;
-            set => warmupRounds = value > 0 ? value : throw new ArgumentOutOfRangeException(nameof(warmupRounds));
-        }
+            get;
+            init => field = value > 0 ? value : throw new ArgumentOutOfRangeException(nameof(warmupRounds));
+        } = 10;
 
         /// <summary>
         /// Gets or sets a value indicating that the initial node in the cluster is starting.
         /// </summary>
-        public bool ColdStart { get; set; } = true;
+        public bool ColdStart { get; init; } = true;
 
         /// <summary>
         /// Gets or sets request processing timeout.
@@ -135,7 +122,7 @@ public partial class RaftCluster
         public TimeSpan RequestTimeout
         {
             get => requestTimeout ?? TimeSpan.FromMilliseconds(LowerElectionTimeout);
-            set => requestTimeout = value > TimeSpan.Zero ? value : throw new ArgumentOutOfRangeException(nameof(value));
+            init => requestTimeout = value > TimeSpan.Zero ? value : throw new ArgumentOutOfRangeException(nameof(value));
         }
 
         /// <summary>
@@ -144,7 +131,7 @@ public partial class RaftCluster
         public int UpperElectionTimeout
         {
             get => electionTimeout.UpperValue;
-            set => electionTimeout = electionTimeout with { UpperValue = value };
+            init => electionTimeout = electionTimeout with { UpperValue = value };
         }
 
         /// <summary>
@@ -155,7 +142,7 @@ public partial class RaftCluster
         public ILoggerFactory LoggerFactory
         {
             get => field ?? NullLoggerFactory.Instance;
-            set;
+            init;
         }
 
         /// <inheritdoc/>
@@ -164,19 +151,23 @@ public partial class RaftCluster
         /// <summary>
         /// Gets metadata associated with local cluster member.
         /// </summary>
-        public IDictionary<string, string> Metadata { get; }
+        public IDictionary<string, string> Metadata { get; } = new Dictionary<string, string>();
 
-        /// <summary>
-        /// Gets or sets a value indicating that the cluster member
-        /// represents standby node which is never become a leader.
-        /// </summary>
-        public bool Standby { get; set; }
+        /// <inheritdoc cref="IClusterMemberConfiguration.Standby"/>
+        public bool Standby { get; init; }
 
-        /// <summary>
-        /// Gets a value indicating that the follower node should not try to upgrade
-        /// to the candidate state if the leader is reachable via the network.
-        /// </summary>
-        public bool AggressiveLeaderStickiness { get; set; }
+        /// <inheritdoc cref="IClusterMemberConfiguration.AggressiveLeaderStickiness"/>
+        public bool AggressiveLeaderStickiness { get; init; }
+
+        /// <inheritdoc cref="IClusterMemberConfiguration.MaxReplicationLag"/>
+        public int MaxReplicationLag
+        {
+            get;
+            init => field = value > 0 ? value : throw new ArgumentOutOfRangeException(nameof(value));
+        } = 16;
+
+        /// <inheritdoc cref="IClusterMemberConfiguration.IsLeaderLeaseEnabled"/>
+        public bool IsLeaderLeaseEnabled { get; init; }
 
         internal abstract RaftClusterMember CreateClient(ILocalMember localMember, EndPoint endPoint);
 
@@ -185,7 +176,7 @@ public partial class RaftCluster
 
     private interface IConnectionOrientedTransportConfiguration : IClusterMemberConfiguration
     {
-        TimeSpan ConnectTimeout { get; set; }
+        TimeSpan ConnectTimeout { get; init; }
     }
 
     /// <summary>
@@ -196,7 +187,7 @@ public partial class RaftCluster
     {
         private readonly IConnectionListenerFactory serverFactory;
         private readonly IConnectionFactory clientFactory;
-        private TimeSpan? connectTimeout;
+        private readonly TimeSpan? connectTimeout;
 
         /// <summary>
         /// Initializes a new custom transport settings.
@@ -221,12 +212,12 @@ public partial class RaftCluster
         /// </summary>
         public TimeSpan ConnectTimeout
         {
-            get => connectTimeout ?? RequestTimeout;
-            set => connectTimeout = value > TimeSpan.Zero ? value : throw new ArgumentOutOfRangeException(nameof(value));
+            get => connectTimeout ?? TimeSpan.FromMilliseconds(LowerElectionTimeout * HeartbeatThreshold);
+            init => connectTimeout = value > TimeSpan.Zero ? value : throw new ArgumentOutOfRangeException(nameof(value));
         }
 
         /// <inheritdoc />
-        public override EndPoint HostEndPoint { get; }
+        protected override EndPoint HostEndPoint { get; }
 
         /// <summary>
         /// Gets or sets a comparer for <see cref="EndPoint"/> data type.
@@ -261,7 +252,7 @@ public partial class RaftCluster
         }
 
         /// <inheritdoc />
-        public sealed override IPEndPoint HostEndPoint { get; }
+        protected sealed override IPEndPoint HostEndPoint { get; }
 
         /// <summary>
         /// Gets or sets the maximum number of parallel requests that can be handled simultaneously.
@@ -273,7 +264,7 @@ public partial class RaftCluster
         public int ServerBacklog
         {
             get;
-            set => field = value > 0 ? value : throw new ArgumentOutOfRangeException(nameof(value));
+            init => field = value > 0 ? value : throw new ArgumentOutOfRangeException(nameof(value));
         } = 10;
 
         /// <summary>
@@ -282,7 +273,7 @@ public partial class RaftCluster
         public byte TimeToLive
         {
             get;
-            set;
+            init;
         }
     }
 
@@ -291,28 +282,22 @@ public partial class RaftCluster
     /// </summary>
     public sealed class TcpConfiguration : BuiltInTransportConfiguration, IConnectionOrientedTransportConfiguration
     {
-        private int transmissionBlockSize;
-        private TimeSpan? gracefulShutdown, connectTimeout;
+        private readonly TimeSpan? gracefulShutdown, connectTimeout;
 
         /// <summary>
-        /// Initializes a new UDP transport settings.
+        /// Initializes a new TCP transport settings.
         /// </summary>
         /// <param name="localNodeHostAddress">The address used to listen requests to the local node.</param>
         public TcpConfiguration(IPEndPoint localNodeHostAddress)
             : base(localNodeHostAddress)
         {
-            transmissionBlockSize = ushort.MaxValue;
-            LingerOption = ITcpTransport.CreateDefaultLingerOption();
         }
 
         /// <summary>
         /// Gets configuration that specifies whether a TCP socket will
         /// delay its closing in an attempt to send all pending data.
         /// </summary>
-        public LingerOption LingerOption
-        {
-            get;
-        }
+        public LingerOption LingerOption { get; } = ITcpTransport.CreateDefaultLingerOption();
 
         /// <summary>
         /// Gets or sets timeout used for graceful shutdown of the server.
@@ -320,7 +305,7 @@ public partial class RaftCluster
         public TimeSpan GracefulShutdownTimeout
         {
             get => gracefulShutdown ?? RequestTimeout;
-            set => gracefulShutdown = value;
+            init => gracefulShutdown = value;
         }
 
         /// <summary>
@@ -336,9 +321,9 @@ public partial class RaftCluster
         /// </remarks>
         public int TransmissionBlockSize
         {
-            get => transmissionBlockSize;
-            set => transmissionBlockSize = ITcpTransport.ValidateTransmissionBlockSize(value);
-        }
+            get;
+            init => field = ITcpTransport.ValidateTransmissionBlockSize(value);
+        } = ushort.MaxValue;
 
         /// <summary>
         /// Gets or sets transport-level encryption options.
@@ -347,7 +332,7 @@ public partial class RaftCluster
         public SslOptions? SslOptions
         {
             get;
-            set;
+            init;
         }
 
         /// <summary>
@@ -356,7 +341,7 @@ public partial class RaftCluster
         public TimeSpan ConnectTimeout
         {
             get => connectTimeout ?? RequestTimeout;
-            set => connectTimeout = value > TimeSpan.Zero ? value : throw new ArgumentOutOfRangeException(nameof(value));
+            init => connectTimeout = value > TimeSpan.Zero ? value : throw new ArgumentOutOfRangeException(nameof(value));
         }
 
         internal override TcpClient CreateClient(ILocalMember localMember, EndPoint endPoint)

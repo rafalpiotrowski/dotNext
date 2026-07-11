@@ -1,6 +1,7 @@
 namespace DotNext.Net.Cluster.Consensus.Raft;
 
 using IO.Log;
+using Membership;
 using Replication;
 
 /// <summary>
@@ -12,11 +13,6 @@ public interface IRaftCluster : IReplicationCluster<IRaftLogEntry>, IPeerMesh<IR
     /// Represents metrics attribute containing the address of the local node.
     /// </summary>
     protected const string LocalAddressMeterAttributeName = "dotnext.raft.server.address";
-
-    /// <summary>
-    /// Gets term number used by Raft algorithm to check the consistency of the cluster.
-    /// </summary>
-    long Term => AuditTrail.Term;
 
     /// <summary>
     /// Gets election timeout used by local cluster member.
@@ -31,7 +27,7 @@ public interface IRaftCluster : IReplicationCluster<IRaftLogEntry>, IPeerMesh<IR
     /// <summary>
     /// Defines persistent state for the Raft-based cluster.
     /// </summary>
-    new IPersistentState AuditTrail { get; set; }
+    new IPersistentState AuditTrail { get; }
 
     /// <summary>
     /// Tries to get the lease that can be used to perform the read with linearizability guarantees.
@@ -68,21 +64,29 @@ public interface IRaftCluster : IReplicationCluster<IRaftLogEntry>, IPeerMesh<IR
     /// <summary>
     /// Ensures linearizable read from underlying state machine.
     /// </summary>
+    /// <param name="barrierType">Read barrier type. It has effect only when this instance is a leader.</param>
     /// <param name="token">The token that can be used to cancel the operation.</param>
     /// <returns>The task representing asynchronous result.</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="barrierType"/> is invalid.</exception>
     /// <exception cref="OperationCanceledException">The operation has been canceled.</exception>
     /// <exception cref="QuorumUnreachableException">The quorum is not visible to the local node.</exception>
-    ValueTask ApplyReadBarrierAsync(CancellationToken token = default);
+    ValueTask ApplyReadBarrierAsync(ReadBarrierType barrierType, CancellationToken token = default);
 
     /// <summary>
     /// Waits until the local node is elected as the leader.
     /// </summary>
-    /// <param name="timeout">The time to wait; or <see cref="Timeout.InfiniteTimeSpan"/>.</param>
     /// <param name="token">The token that can be used to cancel the operation.</param>
     /// <returns>The leadership token.</returns>
-    /// <exception cref="TimeoutException">The operation is timed out.</exception>
     /// <exception cref="OperationCanceledException">The operation has been canceled.</exception>
     /// <exception cref="ObjectDisposedException">The local node is disposed.</exception>
     /// <seealso cref="LeadershipToken"/>
-    ValueTask<CancellationToken> WaitForLeadershipAsync(TimeSpan timeout, CancellationToken token = default);
+    Task<CancellationToken> WaitForLeadershipAsync(CancellationToken token = default);
+
+    /// <summary>
+    /// Associates the configuration storage with the WAL.
+    /// </summary>
+    /// <param name="auditTrail">The WAL implementation.</param>
+    /// <param name="configurationStorage">The configuration storage.</param>
+    protected static void SetConfigurationStorage(IPersistentState auditTrail, IClusterConfigurationStorage configurationStorage)
+        => auditTrail.ConfigurationStorage = configurationStorage;
 }

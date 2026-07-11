@@ -138,7 +138,7 @@ public sealed class AsyncBinaryReaderWriterTests : Test
 
         public FileSource(int bufferSize)
         {
-            var path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            var path = GetTempPath();
             handle = File.OpenHandle(path, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.Read, FileOptions.Asynchronous | FileOptions.DeleteOnClose);
             writer = new(handle) { MaxBufferSize = bufferSize };
             reader = new(handle) { MaxBufferSize = bufferSize };
@@ -175,7 +175,7 @@ public sealed class AsyncBinaryReaderWriterTests : Test
 
         public BufferedFileSource(int bufferSize)
         {
-            var path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+            var path = GetTempPath();
             handle = File.OpenHandle(path, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.Read,
                 FileOptions.Asynchronous | FileOptions.DeleteOnClose);
             writer = new(handle.AsUnbufferedStream(FileAccess.Write)) { MaxBufferSize = bufferSize };
@@ -299,7 +299,7 @@ public sealed class AsyncBinaryReaderWriterTests : Test
             Equal(valueT, await reader.ParseAsync(InvariantCulture, TimeSpan.Parse, decodingContext, LengthFormat.LittleEndian, token: TestToken));
             Equal(valueT, await reader.ParseAsync(InvariantCulture, static (c, p) => TimeSpan.ParseExact(c, "G", p), decodingContext, LengthFormat.LittleEndian, token: TestToken));
             using var decodedBlob = await reader.ReadAsync(LengthFormat.Compressed, token: TestToken);
-            Equal(blob, decodedBlob.Memory.ToArray());
+            Equal(blob, decodedBlob.Memory);
             Equal(memberId, await reader.ReadAsync<Net.Cluster.ClusterMemberId>(TestToken));
 
             // UTF-8
@@ -524,7 +524,7 @@ public sealed class AsyncBinaryReaderWriterTests : Test
                 var reader = source.CreateReader();
                 var destination = new ArrayBufferWriter<byte>(256);
                 await reader.CopyToAsync(destination, token: TestToken);
-                Equal(content, destination.WrittenSpan.ToArray());
+                Equal(content, destination.WrittenSpan);
             }
         }
     }
@@ -553,7 +553,7 @@ public sealed class AsyncBinaryReaderWriterTests : Test
             var reader = source.CreateReader();
             var destination = new ArrayBufferWriter<byte>(256);
             await reader.CopyToAsync(destination, sourceStream.Length, TestToken);
-            Equal(content, destination.WrittenSpan.ToArray());
+            Equal(content, destination.WrittenSpan);
         }
     }
 

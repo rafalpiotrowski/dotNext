@@ -2,6 +2,8 @@
 
 namespace DotNext;
 
+using Patterns;
+
 public sealed class BitwiseComparerTests : Test
 {
     [Fact]
@@ -99,5 +101,28 @@ public sealed class BitwiseComparerTests : Test
         True(BitwiseComparer<int>.Compare(0, int.MinValue) < 0);
         IComparer<int> comparer = BitwiseComparer<int>.Instance;
         True(comparer.Compare(0, int.MinValue) < 0);
+    }
+
+    [Fact]
+    public static void AlternateComparer()
+    {
+        var key = Guid.NewGuid();
+        var dictionary = new Dictionary<Guid, string>(BitwiseComparer<Guid>.Instance)
+        {
+            { key, key.ToString() }
+        };
+
+        var lookup = dictionary.GetAlternateLookup<ReadOnlySpan<byte>>();
+        Equal(key.ToString(), lookup[key.ToByteArray()]);
+    }
+
+    [Fact]
+    public static void SingletonAccess()
+    {
+        Same(BitwiseComparer<Guid>.Instance, GetSingleton<BitwiseComparer<Guid>>());
+        
+        static T GetSingleton<T>()
+            where T : class, ISingleton<T>
+            => T.Instance;
     }
 }

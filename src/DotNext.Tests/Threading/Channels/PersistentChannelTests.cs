@@ -126,13 +126,13 @@ public sealed class PersistentChannelTests : Test
     private static async Task Produce(ChannelWriter<Int128> writer, Int128 startInclusive, Int128 endExclusive)
     {
         for (Int128 i = startInclusive; i < endExclusive; i++)
-            await writer.WriteAsync(i);
+            await writer.WriteAsync(i, TestToken);
     }
 
     private static async Task Consume(ChannelReader<Int128> reader, Int128 startInclusive, Int128 endExclusive)
     {
         for (Int128 i = startInclusive; i < endExclusive; i++)
-            Equal(i, await reader.ReadAsync());
+            Equal(i, await reader.ReadAsync(TestToken));
     }
 
     private static async Task ConsumeInRange(ChannelReader<Int128> reader)
@@ -231,7 +231,7 @@ public sealed class PersistentChannelTests : Test
     [Fact]
     public static async Task RegressionIssue136()
     {
-        var path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        var path = GetTempPath();
         using (var channel = new SerializationChannel<Int128>(new PersistentChannelOptions
         { Location = path, PartitionCapacity = 3 }))
         {
@@ -272,7 +272,7 @@ public sealed class PersistentChannelTests : Test
     [Fact]
     public static async Task ReentrantConsumption()
     {
-        var path = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        var path = GetTempPath();
         await ProduceTestSet(path, 0, 1000);
         await ProduceTestSet(path, 1000, 2000);
         await ProduceTestSet(path, 2000, 3000);

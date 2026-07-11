@@ -2,6 +2,8 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace DotNext.Net.Cluster.Consensus.Raft;
 
+using Diagnostics;
+
 internal partial class LeaderState<TMember>
 {
     private sealed class Lease : CancellationTokenSource
@@ -40,8 +42,7 @@ internal partial class LeaderState<TMember>
 
     private void RenewLease(TimeSpan elapsed)
     {
-        var currentLease = lease;
-        if (currentLease is not null && currentLease.TryRenew(elapsed = maxLease - elapsed) is false)
+        if (lease is { } currentLease && currentLease.TryRenew(elapsed = maxLease - elapsed) is false)
         {
             var newLease = new Lease();
             if (ReferenceEquals(Interlocked.CompareExchange(ref lease, newLease, currentLease), currentLease))
@@ -53,6 +54,14 @@ internal partial class LeaderState<TMember>
                 newLease.Dispose();
             }
         }
+    }
+    
+    private double RenewLease(Timestamp startTime)
+    {
+        var elapsedMillis = startTime.GetElapsedMilliseconds(TimeProvider.System, out startTime);
+        RenewLease(TimeSpan.FromMilliseconds(elapsedMillis));
+        UpdateLeaderStickiness(startTime);
+        return elapsedMillis;
     }
 
     private void DestroyLease()
